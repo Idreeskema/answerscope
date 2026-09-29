@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.local
+.devdb/
+*.log
+.DS_Store
+Thumbs.db
+apps/web/node_modules/
+apps/api/node_modules/
+apps/api/generated/
+apps/web/dist/
+apps/api/dist/

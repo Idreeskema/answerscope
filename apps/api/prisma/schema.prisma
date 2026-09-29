@@ -1,0 +1,678 @@
+// AI Search Readiness Analyzer - Core Data Model
+// Every score/check row must be traceable to evidence (see project spec section 3 & 14).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum CrawlStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum CheckStatus {
+  PASS
+  WARNING
+  FAIL
+  NOT_APPLICABLE
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum AnswerStatus {
+  DIRECTLY_ANSWERED
+  PARTIALLY_ANSWERED
+  NOT_ANSWERED
+}
+
+enum QueryStatus {
+  PENDING
+  APPROVED
+  EDITED
+  REJECTED
+}
+
+enum RecommendationStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  DISMISSED
+}
+
+enum FixStatus {
+  GENERATED
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+enum ImplementationType {
+  META_TITLE
+  META_DESCRIPTION
+  JSON_LD
+  FAQ
+  ANSWER_SECTION
+  INTERNAL_LINK
+  CONTENT_UPDATE
+  PAGE_OUTLINE
+  OTHER
+}
+
+enum EntityType {
+  ORGANIZATION
+  PERSON
+  PRODUCT
+  SERVICE
+  LOCATION
+  OTHER
+}
+
+enum AuditStatus {
+  QUEUED
+  CRAWLING
+  ANALYZING
+  COMPLETED
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Identity / Multi-tenancy
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships   WorkspaceMember[]
+  reviewedFixes GeneratedFix[]    @relation("FixReviewer")
+  auditLogs     AuditLogEntry[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   WorkspaceMember[]
+  websites  Website[]
+  auditLogs AuditLogEntry[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+// ---------------------------------------------------------------------------
+// Website / Crawl
+// ---------------------------------------------------------------------------
+
+model Website {
+  id          String   @id @default(uuid())
+  workspaceId String
+  url         String
+  domain      String
+  name        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  crawlJobs    CrawlJob[]
+  audits       Audit[]
+  pages        Page[]
+  entities     Entity[]
+  queries      Query[]
+  competitors  Competitor[]  @relation("TargetWebsite")
+  auditChanges AuditChange[]
+
+  @@unique([workspaceId, url])
+  @@index([workspaceId])
+  @@map("websites")
+}
+
+model CrawlJob {
+  id        String      @id @default(uuid())
+  websiteId String
+  status    CrawlStatus @default(QUEUED)
+
+  maxPages    Int    @default(100)
+  maxDepth    Int    @default(4)
+  concurrency Int    @default(4)
+  timeoutMs   Int    @default(15000)
+  userAgent   String @default("AISearchReadinessBot/1.0 (+https://example.com/bot)")
+
+  pagesDiscovered Int     @default(0)
+  pagesCrawled    Int     @default(0)
+  progress        Int     @default(0)
+  statusMessage   String?
+
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  robotsTxtContent String? // raw robots.txt body if found, for SEOCheck evidence citations
+  sitemapUrls      Json? // sitemap.xml / sitemap index URLs discovered (string[])
+
+  website Website      @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  pages   Page[]
+  audit   Audit?
+  errors  CrawlError[]
+
+  @@index([websiteId])
+  @@map("crawl_jobs")
+}
+
+model CrawlError {
+  id         String   @id @default(uuid())
+  crawlJobId String
+  url        String
+  message    String
+  createdAt  DateTime @default(now())
+
+  crawlJob CrawlJob @relation(fields: [crawlJobId], references: [id], onDelete: Cascade)
+
+  @@index([crawlJobId])
+  @@map("crawl_errors")
+}
+
+model Page {
+  id             String  @id @default(uuid())
+  crawlJobId     String
+  websiteId      String
+  url            String
+  normalizedUrl  String
+  canonicalUrl   String?
+  statusCode     Int?
+  redirectedFrom String?
+  isIndexable    Boolean @default(true)
+  robotsMeta     String?
+
+  title           String?
+  metaDescription String?
+  headings        Json? // [{ level: 1, text: "..." }, ...]
+  contentText     String? // extracted visible text (paragraphs joined)
+  wordCount       Int     @default(0)
+  language        String?
+
+  ogData      Json?
+  twitterData Json?
+  jsonLd      Json? // array of parsed JSON-LD blocks
+  images      Json? // [{ src, alt }]
+
+  fetchTimeMs  Int?
+  discoveredAt DateTime  @default(now())
+  crawledAt    DateTime?
+
+  crawlJob CrawlJob @relation(fields: [crawlJobId], references: [id], onDelete: Cascade)
+  website  Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  outboundLinks   PageLink[]       @relation("SourcePage")
+  inboundLinks    PageLink[]       @relation("TargetPage")
+  seoChecks       SEOCheck[]
+  contentAnalysis ContentAnalysis?
+  schemaAnalyses  SchemaAnalysis[]
+  aeoAnalysis     AEOAnalysis?
+  entities        Entity[]
+  queries         Query[]
+
+  @@unique([crawlJobId, normalizedUrl])
+  @@index([crawlJobId])
+  @@index([websiteId])
+  @@map("pages")
+}
+
+model PageLink {
+  id           String  @id @default(uuid())
+  sourcePageId String
+  targetUrl    String
+  targetPageId String?
+  anchorText   String?
+  isInternal   Boolean @default(true)
+  isBroken     Boolean @default(false)
+  statusCode   Int?
+
+  sourcePage Page  @relation("SourcePage", fields: [sourcePageId], references: [id], onDelete: Cascade)
+  targetPage Page? @relation("TargetPage", fields: [targetPageId], references: [id])
+
+  @@index([sourcePageId])
+  @@index([targetPageId])
+  @@map("page_links")
+}
+
+// ---------------------------------------------------------------------------
+// Analysis: Technical SEO / Content / Schema
+// ---------------------------------------------------------------------------
+
+model SEOCheck {
+  id             String      @id @default(uuid())
+  auditId        String
+  pageId         String?
+  checkId        String
+  category       String
+  status         CheckStatus
+  severity       Severity
+  score          Float
+  evidence       String
+  recommendation String
+  createdAt      DateTime    @default(now())
+
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  page  Page? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([auditId])
+  @@index([pageId])
+  @@index([checkId])
+  @@map("seo_checks")
+}
+
+model ContentAnalysis {
+  id                String   @id @default(uuid())
+  pageId            String   @unique
+  auditId           String
+  paragraphCount    Int      @default(0)
+  avgSentenceLength Float    @default(0)
+  readabilityScore  Float?
+  duplicateOfPageId String?
+  thinContent       Boolean  @default(false)
+  topics            Json?
+  createdAt         DateTime @default(now())
+
+  page  Page  @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@index([auditId])
+  @@map("content_analyses")
+}
+
+model Entity {
+  id            String     @id @default(uuid())
+  websiteId     String
+  auditId       String
+  sourcePageId  String?
+  name          String
+  type          EntityType
+  description   String?
+  confidence    Float      @default(0)
+  relationships Json?
+  createdAt     DateTime   @default(now())
+
+  website    Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  audit      Audit   @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  sourcePage Page?   @relation(fields: [sourcePageId], references: [id])
+
+  @@index([websiteId])
+  @@index([auditId])
+  @@map("entities")
+}
+
+model SchemaAnalysis {
+  id         String   @id @default(uuid())
+  pageId     String
+  auditId    String
+  schemaType String
+  isValid    Boolean
+  errors     Json?
+  rawJsonLd  Json?
+  createdAt  DateTime @default(now())
+
+  page  Page  @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+  @@index([auditId])
+  @@map("schema_analyses")
+}
+
+// ---------------------------------------------------------------------------
+// AEO / GEO
+// ---------------------------------------------------------------------------
+
+model AEOAnalysis {
+  id                    String   @id @default(uuid())
+  auditId               String
+  pageId                String   @unique
+  questionCoverageScore Float
+  answerDirectnessScore Float
+  contentStructureScore Float
+  faqCoverageScore      Float
+  entityClarityScore    Float
+  structuredDataScore   Float
+  overallScore          Float
+  details               Json // { questions: [{ question, status, evidence, recommendation }] }
+  createdAt             DateTime @default(now())
+
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  page  Page  @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([auditId])
+  @@map("aeo_analyses")
+}
+
+model GEOAnalysis {
+  id                      String   @id @default(uuid())
+  auditId                 String   @unique
+  entityClarityScore      Float
+  topicalCoverageScore    Float
+  contentQualityScore     Float
+  machineReadabilityScore Float
+  citationReadinessScore  Float
+  overallScore            Float
+  details                 Json
+  createdAt               DateTime @default(now())
+
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@map("geo_analyses")
+}
+
+// ---------------------------------------------------------------------------
+// Query Generation & Testing
+// ---------------------------------------------------------------------------
+
+model Query {
+  id           String      @id @default(uuid())
+  websiteId    String
+  auditId      String
+  sourcePageId String?
+  query        String
+  intent       String
+  category     String
+  topic        String?
+  entity       String?
+  importance   Int         @default(5)
+  status       QueryStatus @default(PENDING)
+  groupName    String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  website    Website       @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  audit      Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  sourcePage Page?         @relation(fields: [sourcePageId], references: [id])
+  results    QueryResult[]
+
+  @@index([websiteId])
+  @@index([auditId])
+  @@map("queries")
+}
+
+model QueryResult {
+  id               String   @id @default(uuid())
+  queryId          String
+  provider         String
+  timestamp        DateTime @default(now())
+  targetMentioned  Boolean
+  targetCited      Boolean
+  citedUrls        Json?
+  competingBrands  Json?
+  competingUrls    Json?
+  answerSummary    String?
+  citationPosition Int?
+  providerMetadata Json?
+  createdAt        DateTime @default(now())
+
+  query Query @relation(fields: [queryId], references: [id], onDelete: Cascade)
+
+  @@index([queryId])
+  @@map("query_results")
+}
+
+// ---------------------------------------------------------------------------
+// Competitor Analysis
+// ---------------------------------------------------------------------------
+
+model Competitor {
+  id              String   @id @default(uuid())
+  targetWebsiteId String
+  url             String
+  name            String?
+  createdAt       DateTime @default(now())
+
+  targetWebsite Website              @relation("TargetWebsite", fields: [targetWebsiteId], references: [id], onDelete: Cascade)
+  analyses      CompetitorAnalysis[]
+
+  @@index([targetWebsiteId])
+  @@map("competitors")
+}
+
+model CompetitorAnalysis {
+  id                    String   @id @default(uuid())
+  competitorId          String
+  auditId               String
+  technicalSeoScore     Float
+  contentScore          Float
+  questionCoverageScore Float
+  entityClarityScore    Float
+  structuredDataScore   Float
+  internalLinkingScore  Float
+  aeoScore              Float
+  geoScore              Float
+  citationScore         Float
+  contentDepthScore     Float
+  gaps                  Json // structured gap findings, see CompetitorGap shape
+  createdAt             DateTime @default(now())
+
+  competitor Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  audit      Audit      @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@index([competitorId])
+  @@index([auditId])
+  @@map("competitor_analyses")
+}
+
+// ---------------------------------------------------------------------------
+// Recommendations & Fixes
+// ---------------------------------------------------------------------------
+
+model Recommendation {
+  id                 String               @id @default(uuid())
+  auditId            String
+  title              String
+  category           String
+  severity           Severity
+  impact             Int
+  effort             Int
+  confidence         Float
+  priority           Float
+  evidence           String
+  explanation        String
+  action             String
+  example            String?
+  affectedUrl        String?
+  implementationType ImplementationType
+  status             RecommendationStatus @default(OPEN)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  audit Audit          @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  fixes GeneratedFix[]
+
+  @@index([auditId])
+  @@map("recommendations")
+}
+
+model GeneratedFix {
+  id               String             @id @default(uuid())
+  recommendationId String
+  type             ImplementationType
+  before           String?
+  after            String
+  status           FixStatus          @default(GENERATED)
+  reviewedById     String?
+  reviewedAt       DateTime?
+  createdAt        DateTime           @default(now())
+
+  recommendation Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  reviewedBy     User?          @relation("FixReviewer", fields: [reviewedById], references: [id])
+
+  @@index([recommendationId])
+  @@map("generated_fixes")
+}
+
+// ---------------------------------------------------------------------------
+// Scoring
+// ---------------------------------------------------------------------------
+
+model ScoreVersion {
+  id          String   @id @default(uuid())
+  version     String   @unique
+  weights     Json
+  description String?
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  scores Score[]
+
+  @@map("score_versions")
+}
+
+model Score {
+  id                 String   @id @default(uuid())
+  auditId            String
+  category           String
+  rawScore           Float
+  weight             Float
+  normalizedScore    Float
+  calculationVersion String
+  breakdown          Json
+  createdAt          DateTime @default(now())
+
+  audit        Audit        @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  scoreVersion ScoreVersion @relation(fields: [calculationVersion], references: [version])
+
+  @@unique([auditId, category])
+  @@index([auditId])
+  @@map("scores")
+}
+
+// ---------------------------------------------------------------------------
+// Audit orchestration & history
+// ---------------------------------------------------------------------------
+
+model Audit {
+  id                 String      @id @default(uuid())
+  websiteId          String
+  crawlJobId         String?     @unique
+  status             AuditStatus @default(QUEUED)
+  overallScore       Float?
+  calculationVersion String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  error              String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  website  Website   @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  crawlJob CrawlJob? @relation(fields: [crawlJobId], references: [id])
+
+  seoChecks          SEOCheck[]
+  contentAnalyses    ContentAnalysis[]
+  entities           Entity[]
+  schemaAnalyses     SchemaAnalysis[]
+  aeoAnalyses        AEOAnalysis[]
+  geoAnalysis        GEOAnalysis?
+  queries            Query[]
+  competitorAnalyses CompetitorAnalysis[]
+  recommendations    Recommendation[]
+  scores             Score[]
+  reports            Report[]
+  changesFrom        AuditChange[]        @relation("FromAudit")
+  changesTo          AuditChange[]        @relation("ToAudit")
+
+  @@index([websiteId])
+  @@map("audits")
+}
+
+model AuditChange {
+  id             String   @id @default(uuid())
+  websiteId      String
+  fromAuditId    String?
+  toAuditId      String
+  scoreDelta     Json
+  newIssues      Json
+  resolvedIssues Json
+  newPages       Json
+  removedPages   Json
+  summary        String?
+  createdAt      DateTime @default(now())
+
+  website   Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  fromAudit Audit?  @relation("FromAudit", fields: [fromAuditId], references: [id])
+  toAudit   Audit   @relation("ToAudit", fields: [toAuditId], references: [id])
+
+  @@index([websiteId])
+  @@map("audit_changes")
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  auditId     String
+  type        String   @default("PDF")
+  filePath    String
+  generatedAt DateTime @default(now())
+
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@index([auditId])
+  @@map("reports")
+}
+
+model AuditLogEntry {
+  id          String   @id @default(uuid())
+  workspaceId String?
+  userId      String?
+  action      String
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  user      User?      @relation(fields: [userId], references: [id])
+
+  @@index([workspaceId])
+  @@map("audit_log_entries")
+}
