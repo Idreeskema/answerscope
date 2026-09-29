@@ -13,3 +13,5 @@ apps/api/node_modules/
 apps/api/generated/
 apps/web/dist/
 apps/api/dist/
+apps/api/.run/
+*.tsbuildinfo

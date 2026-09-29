@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/theme.ts","./src/vite-env.d.ts","./src/api/client.ts","./src/auth/authcontext.tsx","./src/components/protectedroute.tsx","./src/pages/homepage.tsx","./src/pages/loginpage.tsx","./src/pages/registerpage.tsx","./src/pages/websitedetailpage.tsx"],"version":"5.9.3"}
