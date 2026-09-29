@@ -135,9 +135,10 @@ export class CompetitorsService {
       this.prisma.aEOAnalysis.findMany({ where: { auditId: shadowAuditId } }),
     ]);
 
+    const shadowGeo = await this.prisma.gEOAnalysis.findUnique({ where: { auditId: shadowAuditId } });
+
     const scoreByCategory = (rows: typeof targetScores) =>
       new Map(rows.map((r) => [r.category, r.normalizedScore]));
-    const targetMap = scoreByCategory(targetScores);
     const shadowMap = scoreByCategory(shadowScores);
 
     const categoryScore = (map: Map<string, number>, category: string) => map.get(category) ?? 0;
@@ -195,8 +196,8 @@ export class CompetitorsService {
         structuredDataScore: categoryScore(shadowMap, 'STRUCTURED_DATA'),
         internalLinkingScore: categoryScore(shadowMap, 'INTERNAL_LINKING'),
         aeoScore: categoryScore(shadowMap, 'AEO'),
-        geoScore: categoryScore(shadowMap, 'CITATION_EVIDENCE_READINESS'),
-        citationScore: categoryScore(shadowMap, 'CITATION_EVIDENCE_READINESS'),
+        geoScore: shadowGeo?.overallScore ?? 0,
+        citationScore: shadowGeo?.citationReadinessScore ?? 0,
         contentDepthScore: categoryScore(shadowMap, 'CONTENT_QUALITY'),
         gaps,
       },
