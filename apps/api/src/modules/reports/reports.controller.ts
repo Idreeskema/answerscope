@@ -1,5 +1,7 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import * as fs from 'fs';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/jwt.types';
@@ -18,8 +20,17 @@ export class ReportsController {
   ) {}
 
   @Get()
-  async generate(@Param('auditId') auditId: string, @CurrentUser() user: AuthenticatedUser) {
+  async generate(
+    @Param('auditId') auditId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
     await assertAuditAccess(this.prisma, user.userId, auditId);
-    return this.reportsService.generatePdf(auditId);
+    const { filePath } = await this.reportsService.generatePdf(auditId);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="audit-${auditId}.pdf"`,
+    });
+    return new StreamableFile(fs.createReadStream(filePath));
   }
 }
