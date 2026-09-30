@@ -85,7 +85,7 @@ export default function RecommendationFixPanel({
               )}
               <Box mb={1}>
                 <Typography variant="caption" color="text.secondary">
-                  After (AI-generated example)
+                  Suggested fix{fix.status !== 'GENERATED' ? '' : ' (review before approving)'}
                 </Typography>
                 <Typography
                   variant="body2"
