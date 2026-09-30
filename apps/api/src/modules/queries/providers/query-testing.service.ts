@@ -6,6 +6,7 @@ import {
   QueryTestingResult,
 } from './query-testing-provider.interface';
 import { NullQueryTestingProvider } from './null-query-testing.provider';
+import { OpenAiQueryTestingProvider } from './openai-query-testing.provider';
 
 const PROVIDER_ENV_KEYS: Record<QueryTestingProviderName, string> = {
   OPENAI: 'OPENAI_API_KEY',
@@ -16,10 +17,13 @@ const PROVIDER_ENV_KEYS: Record<QueryTestingProviderName, string> = {
 
 /**
  * Central registry/dispatcher for AI Query Testing providers (spec section
- * 10). Real provider implementations (calling the OpenAI/Anthropic/
- * Perplexity/Google APIs) can be dropped in under providers/ and registered
- * here; until an API key is present in .env this always resolves to
- * NullQueryTestingProvider so results are never fabricated.
+ * 10). OPENAI is a real integration (web-search-grounded OpenAI Responses
+ * API - see openai-query-testing.provider.ts) once OPENAI_API_KEY is set.
+ * The other three providers don't have a real implementation yet; drop one
+ * in under providers/ following the same pattern and register it in
+ * resolveProvider(). Without a configured key, or for an unimplemented
+ * provider, this always resolves to NullQueryTestingProvider so results are
+ * never fabricated.
  */
 @Injectable()
 export class QueryTestingService {
@@ -34,11 +38,17 @@ export class QueryTestingService {
     if (!key) {
       return new NullQueryTestingProvider(name);
     }
-    // TODO(integration boundary): construct the real provider here, e.g.
-    //   if (name === 'OPENAI') return new OpenAiQueryTestingProvider(key);
-    // Real providers are not implemented in this build - no API keys are
-    // configured in this environment, so falling back to Null keeps the
-    // product honest rather than shipping untested network code.
+
+    if (name === 'OPENAI') {
+      const model = this.config.get<string>('OPENAI_QUERY_TEST_MODEL');
+      return model ? new OpenAiQueryTestingProvider(key, model) : new OpenAiQueryTestingProvider(key);
+    }
+
+    // TODO(integration boundary): Anthropic/Perplexity/Google AI Overviews
+    // don't have a real provider implementation yet - drop one in under
+    // providers/ following OpenAiQueryTestingProvider's pattern and register
+    // it here. Falling back to Null keeps the product honest in the
+    // meantime rather than shipping untested network code.
     return new NullQueryTestingProvider(name);
   }
 
