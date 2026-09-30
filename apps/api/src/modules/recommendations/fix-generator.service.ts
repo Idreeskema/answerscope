@@ -1,8 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EntityType } from '@prisma/client';
-import { generateFixContent } from './fix-generator.helpers';
+import { generateFixContent, FixGenerationContext } from './fix-generator.helpers';
 import { parseAeoQuestions } from './recommendation-engine.helpers';
+import { OpenAiFixContentProvider } from './providers/llm-fix-content.provider';
 
 /**
  * Implements Milestone 10 / spec section 13 (Automatic Fix Generator).
@@ -16,11 +18,22 @@ import { parseAeoQuestions } from './recommendation-engine.helpers';
  * a customer's website without explicit user authorization"; the reviewer
  * approves/rejects via PATCH /recommendations/fixes/:fixId, already wired
  * up in recommendations.controller.ts).
+ *
+ * When OPENAI_API_KEY is configured, the deterministic `after` draft is
+ * additionally passed through OpenAiFixContentProvider for a more natural,
+ * polished rewrite (spec section 12's "Also provide AI-generated fixes
+ * where appropriate") for text-based fix types - the deterministic draft
+ * is always computed first and used as-is whenever the LLM call fails,
+ * returns nothing, or isn't configured, so this never regresses to a worse
+ * or missing result.
  */
 @Injectable()
 export class FixGeneratorService {
   private readonly logger = new Logger(FixGeneratorService.name);
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   async generateFix(recommendationId: string) {
     const recommendation = await this.prisma.recommendation.findUnique({
@@ -66,7 +79,7 @@ export class FixGeneratorService {
       }
     }
 
-    const { before, after } = generateFixContent({
+    const fixContext: FixGenerationContext = {
       implementationType: recommendation.implementationType,
       recommendationTitle: recommendation.title,
       recommendationCategory: recommendation.category,
@@ -88,7 +101,10 @@ export class FixGeneratorService {
         : null,
       aeoQuestions,
       internalLinkTarget,
-    });
+    };
+
+    const { before, after: draftAfter } = generateFixContent(fixContext);
+    const after = (await this.tryLlmEnhance(fixContext, draftAfter)) ?? draftAfter;
 
     this.logger.log(
       `Generated a ${recommendation.implementationType} fix for recommendation ${recommendationId} (audit ${auditId}).`,
@@ -103,6 +119,17 @@ export class FixGeneratorService {
         status: 'GENERATED',
       },
     });
+  }
+
+  /** Returns an LLM-polished rewrite of `draftAfter`, or null if no key is
+   * configured, the fix type isn't LLM-eligible, or the call fails - the
+   * caller always has the deterministic draft to fall back to. */
+  private async tryLlmEnhance(ctx: FixGenerationContext, draftAfter: string): Promise<string | null> {
+    const apiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (!apiKey) return null;
+    const model = this.config.get<string>('OPENAI_FIX_MODEL');
+    const provider = model ? new OpenAiFixContentProvider(apiKey, model) : new OpenAiFixContentProvider(apiKey);
+    return provider.generate(ctx, draftAfter);
   }
 
   /** Picks a real, already-crawled page on the same site with the highest

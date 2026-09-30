@@ -27,8 +27,16 @@ describe('FixGeneratorService.generateFix', () => {
   let productPageId: string;
   const recommendationIds: string[] = [];
   const fixIds: string[] = [];
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
 
   beforeAll(async () => {
+    // Force FixGeneratorService's optional LLM-enhancement path off for
+    // this suite regardless of ambient machine state (a real OPENAI_API_KEY
+    // may be configured in apps/api/.env) - these tests assert the exact
+    // deterministic template output from fix-generator.helpers.ts and must
+    // never make a real network call. Restored in afterAll below.
+    process.env.OPENAI_API_KEY = '';
+
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule],
       providers: [FixGeneratorService],
@@ -203,6 +211,9 @@ describe('FixGeneratorService.generateFix', () => {
     await prisma.website.delete({ where: { id: websiteId } });
     await prisma.workspace.delete({ where: { id: workspaceId } });
     await prisma.$disconnect();
+
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalOpenAiKey;
   });
 
   it('META_TITLE: rewrites the real page title grounded in the real H1/entity', async () => {
