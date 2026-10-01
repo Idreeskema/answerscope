@@ -194,8 +194,9 @@ model CrawlJob {
   completedAt DateTime?
   createdAt   DateTime  @default(now())
 
-  robotsTxtContent String? // raw robots.txt body if found, for SEOCheck evidence citations
-  sitemapUrls      Json? // sitemap.xml / sitemap index URLs discovered (string[])
+  robotsTxtContent       String? // raw robots.txt body if found, for SEOCheck evidence citations
+  sitemapUrls            Json? // sitemap.xml / sitemap index URLs discovered (string[])
+  homepageScreenshotPath String? // local file path to a captured homepage screenshot (PNG), if any
 
   website Website      @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   pages   Page[]

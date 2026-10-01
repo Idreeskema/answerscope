@@ -4,6 +4,7 @@ import type { AuditDetail } from '../../types/audit';
 import { categoryLabel, severityColor } from '../../utils/auditFormatting';
 import CategoryScoresChart from './CategoryScoresChart';
 import ScoreBreakdownDialog from './ScoreBreakdownDialog';
+import WebsitePreview from './WebsitePreview';
 import type { IssueSource } from './IssueDetailDialog';
 
 /**
@@ -53,17 +54,21 @@ export default function OverviewTab({
     <Box>
       <Grid container spacing={2}>
         <Grid item xs={12} md={7}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Category scores
-              </Typography>
-              <Typography variant="body2" color="text.secondary" mb={2}>
-                Click a category to see exactly how it was calculated.
-              </Typography>
-              <CategoryScoresChart scores={audit.scores} onSelectCategory={setDrillCategory} />
-            </CardContent>
-          </Card>
+          <Stack spacing={2}>
+            <WebsitePreview auditId={audit.id} domain={audit.website.domain} />
+
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Category scores
+                </Typography>
+                <Typography variant="body2" color="text.secondary" mb={2}>
+                  Click a category to see exactly how it was calculated.
+                </Typography>
+                <CategoryScoresChart scores={audit.scores} onSelectCategory={setDrillCategory} />
+              </CardContent>
+            </Card>
+          </Stack>
         </Grid>
 
         <Grid item xs={12} md={5}>
