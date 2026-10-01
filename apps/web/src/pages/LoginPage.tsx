@@ -2,8 +2,10 @@ import { useState, FormEvent } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
+  Box,
   Button,
   CircularProgress,
+  Divider,
   IconButton,
   InputAdornment,
   Link,
@@ -15,9 +17,15 @@ import EmailRoundedIcon from '@mui/icons-material/EmailRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded';
+import PlayCircleOutlineRoundedIcon from '@mui/icons-material/PlayCircleOutlineRounded';
 import AuthLayout from '../components/auth/AuthLayout';
 import { apiClient } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+
+// Pre-seeded demo account (has a completed audit to explore immediately).
+// Only meant for local/demo environments - not a secret, just a shortcut.
+const DEMO_EMAIL = 'e2e-test@example.com';
+const DEMO_PASSWORD = 'SuperSecret123';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -25,22 +33,32 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function performLogin(loginEmail: string, loginPassword: string) {
     setError(null);
-    setLoading(true);
     try {
-      const res = await apiClient.post('/auth/login', { email, password });
+      const res = await apiClient.post('/auth/login', { email: loginEmail, password: loginPassword });
       login(res.data.accessToken, res.data.user);
       navigate('/');
     } catch (err: any) {
       setError(err?.response?.data?.message ?? 'Login failed');
-    } finally {
-      setLoading(false);
     }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    await performLogin(email, password);
+    setLoading(false);
+  }
+
+  async function handleDemoLogin() {
+    setDemoLoading(true);
+    await performLogin(DEMO_EMAIL, DEMO_PASSWORD);
+    setDemoLoading(false);
   }
 
   return (
@@ -104,7 +122,7 @@ export default function LoginPage() {
             variant="contained"
             size="large"
             fullWidth
-            disabled={loading}
+            disabled={loading || demoLoading}
             startIcon={loading ? <CircularProgress size={18} color="inherit" /> : undefined}
             sx={{ py: 1.25, fontWeight: 700, boxShadow: 'none' }}
           >
@@ -112,12 +130,38 @@ export default function LoginPage() {
           </Button>
         </Stack>
       </form>
-      <Typography variant="body2" color="text.secondary" mt={3} textAlign="center">
-        No account yet?{' '}
-        <Link component={RouterLink} to="/register" fontWeight={600}>
-          Create one
-        </Link>
+
+      <Divider sx={{ my: 2.5 }}>
+        <Typography variant="caption" color="text.secondary">
+          or
+        </Typography>
+      </Divider>
+
+      <Button
+        variant="outlined"
+        size="large"
+        fullWidth
+        disabled={loading || demoLoading}
+        onClick={handleDemoLogin}
+        startIcon={
+          demoLoading ? <CircularProgress size={18} /> : <PlayCircleOutlineRoundedIcon />
+        }
+        sx={{ py: 1.25, fontWeight: 700 }}
+      >
+        {demoLoading ? 'Signing in...' : 'Try demo account'}
+      </Button>
+      <Typography variant="caption" color="text.secondary" display="block" textAlign="center" mt={1}>
+        Explores a pre-audited site with real scores and recommendations - no sign-up needed.
       </Typography>
+
+      <Box mt={3}>
+        <Typography variant="body2" color="text.secondary" textAlign="center">
+          No account yet?{' '}
+          <Link component={RouterLink} to="/register" fontWeight={600}>
+            Create one
+          </Link>
+        </Typography>
+      </Box>
     </AuthLayout>
   );
 }
