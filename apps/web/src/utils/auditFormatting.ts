@@ -110,6 +110,41 @@ export function queryStatusColor(status: QueryStatus): 'default' | 'success' | '
   }
 }
 
+/**
+ * Score-band status colors - the dataviz skill's fixed, never-themed status
+ * palette (good/warning/critical), validated for contrast on a light
+ * surface. Always paired with an icon + text label where used (never color
+ * alone), per that skill's rule for status encodings.
+ */
+export const SCORE_STATUS_COLORS = {
+  good: '#0ca30c',
+  warning: '#fab219',
+  critical: '#d03b3b',
+} as const;
+
+export type ScoreStatus = keyof typeof SCORE_STATUS_COLORS;
+
+export function scoreStatus(value: number): ScoreStatus {
+  if (value >= 70) return 'good';
+  if (value >= 50) return 'warning';
+  return 'critical';
+}
+
+export function scoreStatusColor(value: number): string {
+  return SCORE_STATUS_COLORS[scoreStatus(value)];
+}
+
+export function scoreStatusLabel(status: ScoreStatus): string {
+  switch (status) {
+    case 'good':
+      return 'Strong';
+    case 'warning':
+      return 'Needs attention';
+    case 'critical':
+      return 'Weak';
+  }
+}
+
 export function formatScore(value: number | null | undefined, digits = 0): string {
   if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
   return value.toFixed(digits);

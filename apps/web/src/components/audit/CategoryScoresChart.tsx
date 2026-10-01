@@ -1,27 +1,24 @@
-import { useMemo } from 'react';
-import { Bar } from 'react-chartjs-2';
-import {
-  BarElement,
-  CategoryScale,
-  Chart as ChartJS,
-  LinearScale,
-  Tooltip,
-  type ChartEvent,
-  type ActiveElement,
-} from 'chart.js';
-import { Box, List, ListItemButton, ListItemText, Typography, useTheme } from '@mui/material';
+import { Box, Stack, Typography } from '@mui/material';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
+import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded';
 import type { ScoreRow } from '../../types/audit';
-import { categoryLabel } from '../../utils/auditFormatting';
+import { categoryLabel, scoreStatus, scoreStatusColor, type ScoreStatus } from '../../utils/auditFormatting';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
+const STATUS_ICON: Record<ScoreStatus, typeof CheckCircleRoundedIcon> = {
+  good: CheckCircleRoundedIcon,
+  warning: WarningRoundedIcon,
+  critical: ErrorRoundedIcon,
+};
 
 /**
- * Category score bars (spec section 15). Deliberately a single series (the
- * "score" measure per category) so every bar uses one color - see
- * dataviz skill anti-patterns ("a value-ramp on nominal categories" /
- * "rainbow bars for one series" are both listed as mistakes to avoid).
- * The list beneath doubles as the accessible/table-view twin: every value is
- * reachable and clickable without relying on canvas hover.
+ * Category score rows (spec section 15). A single series (one "score"
+ * measure per category), colored by status band rather than one flat hue -
+ * a valid status encoding per the dataviz skill (never color alone: every
+ * row also carries an icon and the category name/number as text). Plain DOM
+ * rows rather than a canvas chart, so this doubles as its own accessible/
+ * table-view twin - every value is reachable and clickable without relying
+ * on canvas hover.
  */
 export default function CategoryScoresChart({
   scores,
@@ -30,29 +27,7 @@ export default function CategoryScoresChart({
   scores: ScoreRow[];
   onSelectCategory: (category: string) => void;
 }) {
-  const theme = useTheme();
-  const displayScores = useMemo(
-    () => scores.filter((s) => s.category !== 'OVERALL').sort((a, b) => b.rawScore - a.rawScore),
-    [scores],
-  );
-
-  const primary = theme.palette.primary.main;
-
-  const data = useMemo(
-    () => ({
-      labels: displayScores.map((s) => categoryLabel(s.category)),
-      datasets: [
-        {
-          label: 'Score',
-          data: displayScores.map((s) => Math.round(s.rawScore)),
-          backgroundColor: primary,
-          borderRadius: 4,
-          barThickness: 22,
-        },
-      ],
-    }),
-    [displayScores, primary],
-  );
+  const displayScores = scores.filter((s) => s.category !== 'OVERALL').sort((a, b) => b.rawScore - a.rawScore);
 
   if (displayScores.length === 0) {
     return (
@@ -62,66 +37,61 @@ export default function CategoryScoresChart({
     );
   }
 
-  const handleClick = (_event: ChartEvent, elements: ActiveElement[]) => {
-    if (elements.length === 0) return;
-    const idx = elements[0].index;
-    const category = displayScores[idx]?.category;
-    if (category) onSelectCategory(category);
-  };
-
   return (
-    <Box display="flex" flexDirection="column" gap={2}>
-      <Box sx={{ height: Math.max(180, displayScores.length * 42) }}>
-        <Bar
-          data={data}
-          options={{
-            indexAxis: 'y' as const,
-            maintainAspectRatio: false,
-            onClick: handleClick,
-            onHover: (event, elements) => {
-              const target = event.native?.target as HTMLElement | undefined;
-              if (target) target.style.cursor = elements.length ? 'pointer' : 'default';
-            },
-            scales: {
-              x: {
-                min: 0,
-                max: 100,
-                grid: { color: theme.palette.divider },
-                border: { display: false },
-                ticks: { stepSize: 25 },
-              },
-              y: {
-                grid: { display: false },
-                border: { display: false },
-              },
-            },
-            plugins: {
-              tooltip: {
-                callbacks: {
-                  label: (ctx) => `${ctx.raw}/100`,
-                },
-              },
-            },
-          }}
-        />
-      </Box>
-      <List dense disablePadding sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 0.5 }}>
-        {displayScores.map((s) => (
-          <ListItemButton
+    <Stack spacing={1.25}>
+      {displayScores.map((s) => {
+        const status = scoreStatus(s.rawScore);
+        const color = scoreStatusColor(s.rawScore);
+        const Icon = STATUS_ICON[status];
+        const pct = Math.max(0, Math.min(100, s.rawScore));
+
+        return (
+          <Box
             key={s.category}
             onClick={() => onSelectCategory(s.category)}
-            sx={{ borderRadius: 1, border: 1, borderColor: 'divider' }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') onSelectCategory(s.category);
+            }}
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              border: 1,
+              borderColor: 'divider',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s, border-color 0.15s',
+              '&:hover': { bgcolor: 'action.hover', borderColor: color },
+            }}
           >
-            <ListItemText
-              primary={categoryLabel(s.category)}
-              secondary={`Weight ${(s.weight * 100).toFixed(0)}% of overall`}
-            />
-            <Typography variant="h6" fontWeight={700}>
-              {Math.round(s.rawScore)}
-            </Typography>
-          </ListItemButton>
-        ))}
-      </List>
-    </Box>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={0.75} gap={1}>
+              <Stack direction="row" alignItems="center" gap={0.75} minWidth={0}>
+                <Icon sx={{ fontSize: 18, color, flexShrink: 0 }} />
+                <Typography variant="body2" fontWeight={600} noWrap>
+                  {categoryLabel(s.category)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ flexShrink: 0 }}>
+                  · {(s.weight * 100).toFixed(0)}% weight
+                </Typography>
+              </Stack>
+              <Typography variant="body1" fontWeight={800} sx={{ flexShrink: 0 }}>
+                {Math.round(s.rawScore)}
+              </Typography>
+            </Stack>
+            <Box sx={{ height: 6, borderRadius: 3, bgcolor: 'action.hover', overflow: 'hidden' }}>
+              <Box
+                sx={{
+                  height: '100%',
+                  width: `${pct}%`,
+                  bgcolor: color,
+                  borderRadius: 3,
+                  transition: 'width 0.6s ease',
+                }}
+              />
+            </Box>
+          </Box>
+        );
+      })}
+    </Stack>
   );
 }
