@@ -23,6 +23,7 @@ export function categoryLabel(category: string): string {
 
 export function humanize(id: string): string {
   return id
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2') // camelCase -> camel Case
     .toLowerCase()
     .split(/[_\-\s]+/)
     .filter(Boolean)
