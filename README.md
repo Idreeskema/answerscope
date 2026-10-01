@@ -1,4 +1,6 @@
-# AI Search Readiness Analyzer
+# AnswerScope
+
+**AI Search Readiness Platform, powered by [Expentor](https://expentor.com).**
 
 An explainable AI Search Readiness / AEO / GEO auditing platform. Enter a
 website URL; the platform crawls it, runs deterministic technical SEO,
@@ -13,7 +15,7 @@ implements.
 ## Stack
 
 - **API** (`apps/api`): NestJS 10, Prisma 5, PostgreSQL, Jest.
-- **Web** (`apps/web`): React 18, Vite, MUI 5, Chart.js, TanStack Query.
+- **Web** (`apps/web`): React 18, Vite, MUI 5, TanStack Query.
 - **Crawler**: Playwright + Cheerio, custom robots.txt/sitemap.xml parsing.
 
 ## Local development setup

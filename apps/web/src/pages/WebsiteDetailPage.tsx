@@ -128,9 +128,14 @@ export default function WebsiteDetailPage() {
           <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')} sx={{ mr: 2 }}>
             Websites
           </Button>
-          <Typography variant="h6" fontWeight={700} sx={{ flexGrow: 1 }}>
-            AI Search Readiness Analyzer
-          </Typography>
+          <Stack direction="row" alignItems="baseline" spacing={1} sx={{ flexGrow: 1 }}>
+            <Typography variant="h6" fontWeight={700}>
+              AnswerScope
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Powered by Expentor
+            </Typography>
+          </Stack>
           <Typography variant="body2" sx={{ mr: 2 }}>
             {user?.email}
           </Typography>

@@ -14,6 +14,7 @@ import {
   DialogContent,
   DialogTitle,
   Grid,
+  Stack,
   TextField,
   Toolbar,
   Typography,
@@ -74,9 +75,14 @@ export default function HomePage() {
     <Box bgcolor="background.default" minHeight="100vh">
       <AppBar position="static" color="transparent" elevation={0}>
         <Toolbar>
-          <Typography variant="h6" fontWeight={700} sx={{ flexGrow: 1 }}>
-            AI Search Readiness Analyzer
-          </Typography>
+          <Stack direction="row" alignItems="baseline" spacing={1} sx={{ flexGrow: 1 }}>
+            <Typography variant="h6" fontWeight={700}>
+              AnswerScope
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Powered by Expentor
+            </Typography>
+          </Stack>
           <Typography variant="body2" sx={{ mr: 2 }}>
             {user?.email}
           </Typography>

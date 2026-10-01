@@ -69,7 +69,7 @@ export default function AuthLayout({
           <Stack direction="row" alignItems="center" gap={1.5} mb={4}>
             <TravelExploreRoundedIcon sx={{ fontSize: 36 }} />
             <Typography variant="h6" fontWeight={700}>
-              AI Search Readiness
+              AnswerScope
             </Typography>
           </Stack>
 
@@ -92,6 +92,10 @@ export default function AuthLayout({
               </Stack>
             ))}
           </Stack>
+
+          <Typography variant="caption" sx={{ opacity: 0.6, display: 'block', mt: 6 }}>
+            Powered by Expentor
+          </Typography>
         </Box>
       </Box>
 
@@ -100,7 +104,7 @@ export default function AuthLayout({
           <Stack direction="row" alignItems="center" gap={1} mb={1} sx={{ display: { xs: 'flex', md: 'none' } }}>
             <TravelExploreRoundedIcon color="primary" />
             <Typography variant="subtitle1" fontWeight={700} color="primary">
-              AI Search Readiness
+              AnswerScope
             </Typography>
           </Stack>
 

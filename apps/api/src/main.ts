@@ -20,9 +20,9 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('AI Search Readiness Analyzer API')
+    .setTitle('AnswerScope API')
     .setDescription(
-      'Explainable AI Search Readiness / AEO / GEO auditing platform',
+      'AnswerScope - AI Search Readiness Platform, powered by Expentor. Explainable AEO/GEO auditing.',
     )
     .setVersion('0.1')
     .addBearerAuth()
