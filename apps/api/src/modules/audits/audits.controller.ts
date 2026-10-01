@@ -1,16 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  Post,
-  Res,
-  StreamableFile,
-  UseGuards,
-} from '@nestjs/common';
-import type { Response } from 'express';
-import * as fs from 'fs';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { WorkspaceAccessGuard } from '../workspaces/workspace-access.guard';
@@ -53,28 +41,6 @@ export class AuditsController {
   async getStatus(@Param('auditId') auditId: string, @CurrentUser() user: AuthenticatedUser) {
     await assertAuditAccess(this.prisma, user.userId, auditId);
     return this.auditsService.getStatus(auditId);
-  }
-
-  /** Serves the homepage screenshot captured during this audit's crawl
-   * (see CrawlerService.captureHomepageScreenshot), for the dashboard's
-   * "this is the site we analyzed" preview. */
-  @Get('audits/:auditId/screenshot')
-  async getScreenshot(
-    @Param('auditId') auditId: string,
-    @CurrentUser() user: AuthenticatedUser,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile> {
-    const audit = await assertAuditAccess(this.prisma, user.userId, auditId);
-    const crawlJob = audit.crawlJobId
-      ? await this.prisma.crawlJob.findUnique({ where: { id: audit.crawlJobId } })
-      : null;
-
-    if (!crawlJob?.homepageScreenshotPath || !fs.existsSync(crawlJob.homepageScreenshotPath)) {
-      throw new NotFoundException('No screenshot captured for this audit yet');
-    }
-
-    res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=3600' });
-    return new StreamableFile(fs.createReadStream(crawlJob.homepageScreenshotPath));
   }
 
   @UseGuards(WorkspaceAccessGuard)

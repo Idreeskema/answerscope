@@ -1,7 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import * as fs from 'fs';
-import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CrawlOptions, DEFAULT_CRAWL_OPTIONS } from './crawler.types';
 import { assertUrlIsSafeToFetch } from '../../common/security/ssrf-guard';
@@ -9,11 +7,9 @@ import { fetchViaHttp } from './lib/http-client';
 import { fetchRobots } from './lib/robots';
 import { discoverSitemapUrls } from './lib/sitemap';
 import { extractHtml, hasNoIndexDirective, looksLikeJsRenderedShell } from './lib/html-extractor';
-import { captureScreenshot, closePlaywrightBrowser, renderWithPlaywright } from './lib/renderer';
+import { closePlaywrightBrowser, renderWithPlaywright } from './lib/renderer';
 import { QueueItem, runBfsQueue } from './lib/crawl-queue';
 import { normalizeUrl } from './lib/url-normalizer';
-
-const SCREENSHOT_DIR = path.join(process.cwd(), 'storage', 'screenshots');
 
 interface CrawledPageRecord {
   id: string;
@@ -115,14 +111,8 @@ export class CrawlerService implements OnModuleDestroy {
         where: { id: crawlJobId },
         data: {
           sitemapUrls,
-          statusMessage: `Discovered ${sitemapUrls.length} sitemap URL(s); capturing homepage preview`,
+          statusMessage: `Discovered ${sitemapUrls.length} sitemap URL(s); starting crawl`,
         },
-      });
-
-      const homepageScreenshotPath = await this.captureHomepageScreenshot(crawlJobId, job.website.url, options);
-      await this.prisma.crawlJob.update({
-        where: { id: crawlJobId },
-        data: { homepageScreenshotPath, statusMessage: 'Starting crawl' },
       });
 
       const pageMap = new Map<string, CrawledPageRecord>();
@@ -310,35 +300,6 @@ export class CrawlerService implements OnModuleDestroy {
         .catch((updateErr) => {
           this.logger.error(`Failed to persist FAILED status for crawl job ${crawlJobId}: ${updateErr?.message}`);
         });
-    }
-  }
-
-  /** Best-effort homepage screenshot for the dashboard preview - never
-   * throws, never blocks the crawl on a failure (missing Chromium, a
-   * navigation timeout, etc.). Returns the saved file path, or null. */
-  private async captureHomepageScreenshot(
-    crawlJobId: string,
-    homepageUrl: string,
-    options: CrawlOptions,
-  ): Promise<string | null> {
-    try {
-      const result = await captureScreenshot(homepageUrl, {
-        timeoutMs: options.timeoutMs,
-        userAgent: options.userAgent,
-      });
-      if (!result) return null;
-
-      fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
-      const filePath = path.join(SCREENSHOT_DIR, `${crawlJobId}.png`);
-      fs.writeFileSync(filePath, result.buffer);
-      return filePath;
-    } catch (err) {
-      this.logger.warn(
-        `Homepage screenshot capture failed for crawl job ${crawlJobId}: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-      return null;
     }
   }
 }

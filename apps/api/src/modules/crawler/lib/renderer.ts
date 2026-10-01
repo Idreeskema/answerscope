@@ -85,53 +85,6 @@ export async function renderWithPlaywright(
   }
 }
 
-export interface ScreenshotResult {
-  buffer: Buffer;
-  width: number;
-  height: number;
-}
-
-/**
- * Captures a full-page PNG screenshot of `url` at a desktop viewport size,
- * for the dashboard's "this is the site we analyzed" preview. Same SSRF-safe
- * route interception as renderWithPlaywright, and fails soft (returns null)
- * on any error - a missing preview must never fail or slow down the crawl
- * it's attached to (callers run this as a best-effort side step, not a
- * required part of the pipeline).
- */
-export async function captureScreenshot(
-  url: string,
-  options: { timeoutMs: number; userAgent: string; width?: number; height?: number },
-): Promise<ScreenshotResult | null> {
-  const width = options.width ?? 1280;
-  const height = options.height ?? 800;
-  try {
-    const browser = await getBrowser();
-    if (!browser) return null;
-
-    const context = await browser.newContext({ userAgent: options.userAgent, viewport: { width, height } });
-    try {
-      await context.route('**/*', async (route) => {
-        try {
-          await assertUrlIsSafeToFetch(route.request().url());
-          await route.continue();
-        } catch {
-          await route.abort('blockedbyclient').catch(() => undefined);
-        }
-      });
-
-      const page = await context.newPage();
-      await page.goto(url, { timeout: options.timeoutMs, waitUntil: 'networkidle' });
-      const buffer = await page.screenshot({ type: 'png' });
-      return { buffer, width, height };
-    } finally {
-      await context.close().catch(() => undefined);
-    }
-  } catch {
-    return null;
-  }
-}
-
 /** Closes the shared browser instance, if one was ever launched. Intended for app shutdown. */
 export async function closePlaywrightBrowser(): Promise<void> {
   if (!browserPromise) return;

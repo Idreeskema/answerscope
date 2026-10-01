@@ -55,7 +55,7 @@ export default function OverviewTab({
       <Grid container spacing={2}>
         <Grid item xs={12} md={7}>
           <Stack spacing={2}>
-            <WebsitePreview auditId={audit.id} url={audit.website.url} domain={audit.website.domain} />
+            <WebsitePreview url={audit.website.url} domain={audit.website.domain} />
 
             <Card variant="outlined">
               <CardContent>
