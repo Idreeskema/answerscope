@@ -23,16 +23,104 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
+import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { apiClient } from '../../api/client';
 import type { QueryRow, QueryStatus, QueryTestingProviderName, QueryTestingResult } from '../../types/audit';
-import { formatDateTime, queryStatusColor } from '../../utils/auditFormatting';
+import { formatDateTime, humanize, queryStatusColor } from '../../utils/auditFormatting';
 
-const PROVIDERS: QueryTestingProviderName[] = ['OPENAI', 'ANTHROPIC', 'PERPLEXITY', 'GOOGLE_AI_OVERVIEWS'];
+const PROVIDER_LABELS: Record<QueryTestingProviderName, string> = {
+  OPENAI: 'ChatGPT',
+  ANTHROPIC: 'Claude',
+  PERPLEXITY: 'Perplexity',
+  GOOGLE_AI_OVERVIEWS: 'Google AI Overviews',
+};
+const PROVIDERS = Object.keys(PROVIDER_LABELS) as QueryTestingProviderName[];
+
+const STATUS_HINT: Record<QueryStatus, string> = {
+  PENDING: "You haven't reviewed this question yet",
+  APPROVED: 'You approved this question',
+  EDITED: 'You edited this question',
+  REJECTED: "You rejected this - it won't be prioritized",
+};
+
+function priorityLabel(importance: number): string {
+  if (importance >= 8) return 'High priority';
+  if (importance >= 4) return 'Medium priority';
+  return 'Low priority';
+}
 
 function isTestingResult(value: unknown): value is QueryTestingResult {
   return !!value && typeof value === 'object' && 'status' in (value as Record<string, unknown>);
 }
 
+/** Plain-language verdict banner for a test result - replaces raw
+ * "mentioned yes/no, cited yes/no" with a sentence a non-technical user can
+ * read at a glance, colored to actually match good/bad (the old version
+ * always showed green, even for a "no" result). */
+function ResultBanner({ result, providerLabel }: { result: QueryTestingResult; providerLabel: string }) {
+  if (result.status === 'NOT_CONFIGURED') {
+    return (
+      <Alert severity="info" icon={<InfoOutlinedIcon fontSize="small" />} sx={{ py: 0.5 }}>
+        {providerLabel} isn't connected yet - an API key needs to be added before this can be tested.
+      </Alert>
+    );
+  }
+  if (result.status === 'ERROR') {
+    return (
+      <Alert severity="warning" sx={{ py: 0.5 }}>
+        Couldn't complete this test ({result.errorMessage ?? 'unknown error'}) - try again in a moment.
+      </Alert>
+    );
+  }
+
+  const mentioned = !!result.targetMentioned;
+  const cited = !!result.targetCited;
+  const severity = mentioned && cited ? 'success' : mentioned ? 'warning' : 'error';
+  const Icon = mentioned && cited ? CheckCircleRoundedIcon : mentioned ? WarningRoundedIcon : CancelRoundedIcon;
+  const headline =
+    mentioned && cited
+      ? `${providerLabel} found you - it mentioned your business and linked to your site.`
+      : mentioned
+        ? `${providerLabel} mentioned your business by name, but didn't link to your website.`
+        : `${providerLabel} didn't mention your business at all when asked this.`;
+
+  return (
+    <Box>
+      <Alert severity={severity} icon={<Icon fontSize="small" />} sx={{ py: 0.5 }}>
+        {headline}
+      </Alert>
+      {result.answerSummary && (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mt: 1, pl: 1.5, borderLeft: 3, borderColor: 'divider', fontStyle: 'italic' }}
+        >
+          "{result.answerSummary.length > 320 ? `${result.answerSummary.slice(0, 320)}...` : result.answerSummary}"
+        </Typography>
+      )}
+      {result.competingBrands.length > 0 && (
+        <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
+          Mentioned instead: {result.competingBrands.join(', ')}
+        </Typography>
+      )}
+      {result.citedUrls.length > 0 && (
+        <Typography variant="caption" color="text.secondary" display="block" mt={0.25}>
+          Linked to: {result.citedUrls.join(', ')}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Spec section 9/10: the realistic questions generated for this site, and an
+ * optional real-AI spot check per question. Every label here is written for
+ * a non-technical reader - no raw enum values or "mentioned/cited" jargon
+ * left unexplained (see the explainer banner and ResultBanner above).
+ */
 export default function QueriesTab({ auditId }: { auditId: string }) {
   const queryClient = useQueryClient();
   const queryKey = ['queries', auditId];
@@ -46,6 +134,10 @@ export default function QueriesTab({ auditId }: { auditId: string }) {
   const [editValue, setEditValue] = useState('');
   const [providerByQuery, setProviderByQuery] = useState<Record<string, QueryTestingProviderName>>({});
   const [testResults, setTestResults] = useState<Record<string, QueryTestingResult>>({});
+  // Which single query+provider is currently being tested - a plain
+  // useMutation's isPending is shared across every row, so without this,
+  // clicking Test on one question would show "Testing..." on every row.
+  const [testingKey, setTestingKey] = useState<string | null>(null);
 
   const updateQuery = useMutation({
     mutationFn: async ({ queryId, body }: { queryId: string; body: Partial<{ query: string; status: QueryStatus; importance: number }> }) =>
@@ -64,6 +156,10 @@ export default function QueriesTab({ auditId }: { auditId: string }) {
   const testQuery = useMutation({
     mutationFn: async ({ queryId, provider }: { queryId: string; provider: QueryTestingProviderName }) =>
       (await apiClient.post(`/audits/${auditId}/queries/${queryId}/test/${provider}`)).data,
+    onMutate: (variables) => {
+      setTestingKey(`${variables.queryId}:${variables.provider}`);
+    },
+    onSettled: () => setTestingKey(null),
     onSuccess: (data, variables) => {
       const key = `${variables.queryId}:${variables.provider}`;
       if (isTestingResult(data)) {
@@ -112,11 +208,18 @@ export default function QueriesTab({ auditId }: { auditId: string }) {
 
   return (
     <Box>
+      <Alert severity="info" icon={<InfoOutlinedIcon fontSize="small" />} sx={{ mb: 2 }}>
+        These are realistic questions a real customer might type into Google or ask an AI assistant about
+        this business - generated from the actual content on the site. Click <strong>Test</strong> on any
+        question to see whether a real AI currently mentions this business when asked. Results are a
+        helpful spot-check, not a guarantee - the same question can get a different answer another day.
+      </Alert>
+
       {groups.map(([category, rows]) => (
         <Accordion key={category} defaultExpanded variant="outlined" disableGutters sx={{ mb: 1 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Typography fontWeight={600}>{category}</Typography>
+              <Typography fontWeight={600}>{humanize(category)}</Typography>
               <Chip size="small" label={rows.length} />
             </Stack>
           </AccordionSummary>
@@ -128,7 +231,7 @@ export default function QueriesTab({ auditId }: { auditId: string }) {
                 const ephemeralResult = testResults[testKey];
                 const isEditing = editingId === q.id;
                 return (
-                  <Paper key={q.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Paper key={q.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
                     <Stack direction="row" spacing={1} alignItems="flex-start" flexWrap="wrap">
                       <Box flex={1} minWidth={220}>
                         {isEditing ? (
@@ -155,15 +258,23 @@ export default function QueriesTab({ auditId }: { auditId: string }) {
                             {q.query}
                           </Typography>
                         )}
-                        <Typography variant="caption" color="text.secondary">
-                          Intent: {q.intent} {q.topic ? `· Topic: ${q.topic}` : ''} · Importance {q.importance}/10
-                        </Typography>
+                        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" mt={0.5}>
+                          <Chip size="small" variant="outlined" label={humanize(q.intent)} />
+                          <Chip size="small" variant="outlined" label={priorityLabel(q.importance)} />
+                          {q.topic && (
+                            <Typography variant="caption" color="text.secondary">
+                              From: {q.topic}
+                            </Typography>
+                          )}
+                        </Stack>
                       </Box>
 
-                      <Chip size="small" label={q.status} color={queryStatusColor(q.status)} />
+                      <Tooltip title={STATUS_HINT[q.status]}>
+                        <Chip size="small" label={humanize(q.status)} color={queryStatusColor(q.status)} />
+                      </Tooltip>
 
                       <Stack direction="row" spacing={0.5}>
-                        <Tooltip title="Edit">
+                        <Tooltip title="Edit this question">
                           <IconButton
                             size="small"
                             onClick={() => {
@@ -174,7 +285,7 @@ export default function QueriesTab({ auditId }: { auditId: string }) {
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Approve">
+                        <Tooltip title="Approve - keep this question">
                           <IconButton
                             size="small"
                             color="success"
@@ -183,7 +294,7 @@ export default function QueriesTab({ auditId }: { auditId: string }) {
                             <CheckIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Reject">
+                        <Tooltip title="Reject - not relevant">
                           <IconButton
                             size="small"
                             color="error"
@@ -200,7 +311,10 @@ export default function QueriesTab({ auditId }: { auditId: string }) {
                       </Stack>
                     </Stack>
 
-                    <Stack direction="row" spacing={1} alignItems="center" mt={1}>
+                    <Stack direction="row" spacing={1} alignItems="center" mt={1.25} flexWrap="wrap">
+                      <Typography variant="caption" color="text.secondary">
+                        Test with:
+                      </Typography>
                       <Select
                         size="small"
                         value={provider}
@@ -213,41 +327,28 @@ export default function QueriesTab({ auditId }: { auditId: string }) {
                       >
                         {PROVIDERS.map((p) => (
                           <MenuItem key={p} value={p}>
-                            {p}
+                            {PROVIDER_LABELS[p]}
                           </MenuItem>
                         ))}
                       </Select>
                       <Button
                         size="small"
                         variant="outlined"
-                        disabled={testQuery.isPending}
+                        disabled={testingKey === testKey}
                         onClick={() => testQuery.mutate({ queryId: q.id, provider })}
                       >
-                        Test
+                        {testingKey === testKey ? 'Testing...' : 'Test'}
                       </Button>
                       {q.results.length > 0 && (
                         <Typography variant="caption" color="text.secondary">
-                          Last stored result: {formatDateTime(q.results[q.results.length - 1].timestamp)}
+                          Last tested {formatDateTime(q.results[q.results.length - 1].timestamp)}
                         </Typography>
                       )}
                     </Stack>
 
                     {ephemeralResult && (
                       <Box mt={1}>
-                        {ephemeralResult.status === 'NOT_CONFIGURED' ? (
-                          <Alert severity="info" sx={{ py: 0 }}>
-                            Not tested - provider not configured
-                          </Alert>
-                        ) : ephemeralResult.status === 'ERROR' ? (
-                          <Alert severity="warning" sx={{ py: 0 }}>
-                            Test failed: {ephemeralResult.errorMessage ?? 'Unknown error'}
-                          </Alert>
-                        ) : (
-                          <Alert severity="success" sx={{ py: 0 }}>
-                            {ephemeralResult.provider}: mentioned {ephemeralResult.targetMentioned ? 'yes' : 'no'},
-                            cited {ephemeralResult.targetCited ? 'yes' : 'no'}
-                          </Alert>
-                        )}
+                        <ResultBanner result={ephemeralResult} providerLabel={PROVIDER_LABELS[provider]} />
                       </Box>
                     )}
                   </Paper>

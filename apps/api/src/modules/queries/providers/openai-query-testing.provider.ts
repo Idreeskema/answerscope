@@ -117,17 +117,22 @@ export class OpenAiQueryTestingProvider implements QueryTestingProvider {
     };
 
     const citedUrls = [...new Set(citations.map((c) => c.url))];
-    const targetCitationIndex = citedUrls.findIndex((url) => {
+    const isTargetUrl = (url: string): boolean => {
       const host = hostnameOf(url);
       return host ? host === normalizedDomain || host.endsWith(`.${normalizedDomain}`) : false;
-    });
+    };
+    const targetCitationIndex = citedUrls.findIndex(isTargetUrl);
     const targetCited = targetCitationIndex !== -1;
 
     const brandToken = normalizedDomain.split('.')[0];
     const targetMentioned =
       targetCited || (brandToken.length > 2 && answerText.toLowerCase().includes(brandToken));
 
-    const competingUrls = citedUrls.filter((_, idx) => idx !== targetCitationIndex);
+    // Exclude every citation that belongs to the target's own domain, not
+    // just the first one found - otherwise a second self-citation (e.g. a
+    // different path on the same site) would incorrectly show up as a
+    // "competing" result in its own right.
+    const competingUrls = citedUrls.filter((url) => !isTargetUrl(url));
     const competingBrands = [
       ...new Set(competingUrls.map(hostnameOf).filter((h): h is string => !!h)),
     ];

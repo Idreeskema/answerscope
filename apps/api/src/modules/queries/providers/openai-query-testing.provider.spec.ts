@@ -46,6 +46,41 @@ describe('OpenAiQueryTestingProvider', () => {
     expect(result.answerSummary).toContain('Acme is a popular project management tool');
   });
 
+  it('excludes every self-citation from competingBrands, not just the first one', async () => {
+    // Regression test: a second citation pointing at a different path on the
+    // target's own domain must not show up as a "competing brand" - this
+    // happened when only the first matching index was excluded.
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output: [
+          {
+            type: 'message',
+            content: [
+              {
+                type: 'output_text',
+                text: 'Acme offers project management software.',
+                annotations: [
+                  { type: 'url_citation', url: 'https://acme.example.com/' },
+                  { type: 'url_citation', url: 'https://acme.example.com/pricing' },
+                  { type: 'url_citation', url: 'https://competitor.example.com/' },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    }) as any;
+
+    const provider = new OpenAiQueryTestingProvider('fake-key');
+    const result = await provider.test('What is Acme?', 'acme.example.com');
+
+    expect(result.targetCited).toBe(true);
+    expect(result.competingUrls).toEqual(['https://competitor.example.com/']);
+    expect(result.competingBrands).toEqual(['competitor.example.com']);
+    expect(result.competingBrands).not.toContain('acme.example.com');
+  });
+
   it('reports target not cited/mentioned when nothing matches', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
