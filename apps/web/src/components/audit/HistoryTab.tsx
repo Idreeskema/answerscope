@@ -58,7 +58,7 @@ export default function HistoryTab({
           <Typography variant="h6" gutterBottom>
             All audits
           </Typography>
-          <Table size="small">
+          <Box sx={{ overflowX: "auto" }}><Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>Date</TableCell>
@@ -87,7 +87,7 @@ export default function HistoryTab({
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table></Box>
         </CardContent>
       </Card>
 
@@ -182,7 +182,7 @@ export default function HistoryTab({
                       <Typography variant="subtitle2" gutterBottom>
                         Category score changes
                       </Typography>
-                      <Table size="small">
+                      <Box sx={{ overflowX: "auto" }}><Table size="small">
                         <TableBody>
                           {Object.entries(compare.data.scoreDelta)
                             .filter(([cat]) => cat !== 'OVERALL')
@@ -202,7 +202,7 @@ export default function HistoryTab({
                               </TableRow>
                             ))}
                         </TableBody>
-                      </Table>
+                      </Table></Box>
                     </Grid>
                     <Grid item xs={12} md={6}>
                       <Typography variant="subtitle2" gutterBottom>

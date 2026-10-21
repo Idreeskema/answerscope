@@ -27,7 +27,7 @@ export default function AuthLayout({
   const theme = useTheme();
 
   return (
-    <Box display="flex" minHeight="100vh" bgcolor="background.default">
+    <Box display="flex" minHeight="100dvh" bgcolor="background.default">
       <Box
         sx={{
           display: { xs: 'none', md: 'flex' },
@@ -99,7 +99,15 @@ export default function AuthLayout({
         </Box>
       </Box>
 
-      <Box flex={1} display="flex" flexDirection="column" justifyContent="center" alignItems="center" px={3} py={6}>
+      <Box
+        flex={1}
+        display="flex"
+        flexDirection="column"
+        justifyContent="center"
+        alignItems="center"
+        px={3}
+        sx={{ pt: 'calc(env(safe-area-inset-top) + 48px)', pb: 'calc(env(safe-area-inset-bottom) + 48px)' }}
+      >
         <Box width="100%" maxWidth={400}>
           <Stack direction="row" alignItems="center" gap={1} mb={1} sx={{ display: { xs: 'flex', md: 'none' } }}>
             <TravelExploreRoundedIcon color="primary" />

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AppBar,
   Box,
   Button,
   Chip,
@@ -13,13 +12,11 @@ import {
   Stack,
   Tab,
   Tabs,
-  Toolbar,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AppHeader from '../components/AppHeader';
 import AddIcon from '@mui/icons-material/Add';
 import { apiClient } from '../api/client';
-import { useAuth } from '../auth/AuthContext';
 import { ACTIVE_AUDIT_STATUSES, formatDateTime } from '../utils/auditFormatting';
 import { useAuditStatus } from '../hooks/useAuditStatus';
 import AuditProgress from '../components/audit/AuditProgress';
@@ -41,7 +38,6 @@ import type { AuditDetail, AuditListItem, Website, Workspace } from '../types/au
 export default function WebsiteDetailPage() {
   const { websiteId } = useParams<{ websiteId: string }>();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
   const queryClient = useQueryClient();
 
   const [tab, setTab] = useState(0);
@@ -122,39 +118,21 @@ export default function WebsiteDetailPage() {
   };
 
   return (
-    <Box bgcolor="background.default" minHeight="100vh">
-      <AppBar position="static" color="transparent" elevation={0}>
-        <Toolbar>
-          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')} sx={{ mr: 2 }}>
-            Websites
-          </Button>
-          <Stack direction="row" alignItems="baseline" spacing={1} sx={{ flexGrow: 1 }}>
-            <Typography variant="h6" fontWeight={700}>
-              AnswerScope
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Powered by Expentor
-            </Typography>
-          </Stack>
-          <Typography variant="body2" sx={{ mr: 2 }}>
-            {user?.email}
-          </Typography>
-          <Button onClick={logout}>Sign out</Button>
-        </Toolbar>
-      </AppBar>
+    <Box bgcolor="background.default" minHeight="100dvh">
+      <AppHeader onBack={() => navigate('/')} backLabel="Websites" />
 
-      <Container sx={{ py: 4 }}>
+      <Container sx={{ py: { xs: 2.5, sm: 4 }, px: { xs: 2, sm: 3 }, pb: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} mb={3}>
           <Box>
-            <Typography variant="h5" fontWeight={700}>
+            <Typography variant="h5" fontWeight={800} sx={{ wordBreak: 'break-word' }}>
               {website?.name ?? website?.domain ?? 'Website'}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
               {website?.url}
             </Typography>
           </Box>
 
-          <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
             <Box textAlign="center">
               <Typography variant="caption" color="text.secondary" display="block">
                 AI Search Readiness
@@ -175,7 +153,7 @@ export default function WebsiteDetailPage() {
                 size="small"
                 value={selectedAuditId ?? ''}
                 onChange={(e) => handleSelectAudit(e.target.value)}
-                sx={{ minWidth: 220 }}
+                sx={{ minWidth: { sm: 220 } }}
               >
                 {audits.map((a) => (
                   <MenuItem key={a.id} value={a.id}>
@@ -221,7 +199,13 @@ export default function WebsiteDetailPage() {
 
         {selectedAuditId && audits && audits.length > 0 && (
           <>
-            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+            <Tabs
+              value={tab}
+              onChange={(_, v) => setTab(v)}
+              variant="scrollable"
+              scrollButtons={false}
+              sx={{ mb: 2, mx: { xs: -2, sm: 0 }, px: { xs: 1, sm: 0 }, borderBottom: 1, borderColor: 'divider' }}
+            >
               <Tab label="Overview" />
               <Tab label="Issues" />
               <Tab label="Recommendations" />

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AppBar,
   Box,
   Button,
   Card,
@@ -14,14 +13,14 @@ import {
   DialogContent,
   DialogTitle,
   Grid,
-  Stack,
   TextField,
-  Toolbar,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import LanguageRoundedIcon from '@mui/icons-material/LanguageRounded';
+import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
+import AppHeader from '../components/AppHeader';
 import { apiClient } from '../api/client';
-import { useAuth } from '../auth/AuthContext';
 
 interface Workspace {
   id: string;
@@ -42,7 +41,6 @@ interface Website {
  * the /websites/:websiteId route - see AuditDashboardPage.
  */
 export default function HomePage() {
-  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -72,27 +70,12 @@ export default function HomePage() {
   });
 
   return (
-    <Box bgcolor="background.default" minHeight="100vh">
-      <AppBar position="static" color="transparent" elevation={0}>
-        <Toolbar>
-          <Stack direction="row" alignItems="baseline" spacing={1} sx={{ flexGrow: 1 }}>
-            <Typography variant="h6" fontWeight={700}>
-              AnswerScope
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Powered by Expentor
-            </Typography>
-          </Stack>
-          <Typography variant="body2" sx={{ mr: 2 }}>
-            {user?.email}
-          </Typography>
-          <Button onClick={logout}>Sign out</Button>
-        </Toolbar>
-      </AppBar>
+    <Box bgcolor="background.default" minHeight="100dvh">
+      <AppHeader />
 
-      <Container sx={{ py: 4 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h5" fontWeight={700}>
+      <Container sx={{ py: { xs: 2.5, sm: 4 }, px: { xs: 2, sm: 3 }, pb: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} mb={3}>
+          <Typography variant="h5" fontWeight={800}>
             Your websites
           </Typography>
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)}>
@@ -107,11 +90,30 @@ export default function HomePage() {
             <Grid item xs={12} sm={6} md={4} key={site.id}>
               <Card>
                 <CardActionArea onClick={() => navigate(`/websites/${site.id}`)}>
-                  <CardContent>
-                    <Typography variant="h6">{site.name ?? site.domain}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {site.url}
-                    </Typography>
+                  <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 2 }}>
+                    <Box
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 2,
+                        display: 'grid',
+                        placeItems: 'center',
+                        bgcolor: 'rgba(33,72,192,0.08)',
+                        color: 'primary.main',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <LanguageRoundedIcon />
+                    </Box>
+                    <Box minWidth={0} flexGrow={1}>
+                      <Typography variant="subtitle1" fontWeight={700} noWrap>
+                        {site.name ?? site.domain}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" noWrap>
+                        {site.url}
+                      </Typography>
+                    </Box>
+                    <ChevronRightRoundedIcon color="disabled" />
                   </CardContent>
                 </CardActionArea>
               </Card>
@@ -120,9 +122,32 @@ export default function HomePage() {
         </Grid>
 
         {websites?.length === 0 && (
-          <Typography color="text.secondary">
-            No websites yet - add one to run your first AI Search Readiness audit.
-          </Typography>
+          <Box textAlign="center" py={8} px={2}>
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                mx: 'auto',
+                mb: 2,
+                borderRadius: 4,
+                display: 'grid',
+                placeItems: 'center',
+                bgcolor: 'rgba(33,72,192,0.08)',
+                color: 'primary.main',
+              }}
+            >
+              <LanguageRoundedIcon sx={{ fontSize: 34 }} />
+            </Box>
+            <Typography variant="h6" fontWeight={700} gutterBottom>
+              No websites yet
+            </Typography>
+            <Typography color="text.secondary" mb={3}>
+              Add one to run your first AI Search Readiness audit.
+            </Typography>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)}>
+              Add website
+            </Button>
+          </Box>
         )}
       </Container>
 
