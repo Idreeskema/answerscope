@@ -5,6 +5,7 @@ on:
   push:
     branches: [master]
     paths:
+      - apps/web/**
       - .github/workflows/ios-unsigned-ipa.yml
 
 jobs:
