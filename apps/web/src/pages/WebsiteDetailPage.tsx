@@ -15,6 +15,15 @@ import {
   Typography,
 } from '@mui/material';
 import AppHeader from '../components/AppHeader';
+import MobileTopBar from '../components/mobile/MobileTopBar';
+import MobileAuditHero from '../components/mobile/MobileAuditHero';
+import MobileTabBar, { MOBILE_TAB_BAR_HEIGHT } from '../components/mobile/MobileTabBar';
+import { useMobileLayout } from '../hooks/useMobileLayout';
+import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
+import ReportProblemRoundedIcon from '@mui/icons-material/ReportProblemRounded';
+import AutoFixHighRoundedIcon from '@mui/icons-material/AutoFixHighRounded';
+import QuestionAnswerRoundedIcon from '@mui/icons-material/QuestionAnswerRounded';
+import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
 import AddIcon from '@mui/icons-material/Add';
 import { apiClient } from '../api/client';
 import { ACTIVE_AUDIT_STATUSES, formatDateTime } from '../utils/auditFormatting';
@@ -38,6 +47,7 @@ import type { AuditDetail, AuditListItem, Website, Workspace } from '../types/au
 export default function WebsiteDetailPage() {
   const { websiteId } = useParams<{ websiteId: string }>();
   const navigate = useNavigate();
+  const mobile = useMobileLayout();
   const queryClient = useQueryClient();
 
   const [tab, setTab] = useState(0);
@@ -119,9 +129,26 @@ export default function WebsiteDetailPage() {
 
   return (
     <Box bgcolor="background.default" minHeight="100dvh">
-      <AppHeader onBack={() => navigate('/')} backLabel="Websites" />
+      {mobile ? (
+        <MobileTopBar title={website?.name ?? website?.domain ?? 'Website'} onBack={() => navigate('/')} />
+      ) : (
+        <AppHeader onBack={() => navigate('/')} backLabel="Websites" />
+      )}
 
-      <Container sx={{ py: { xs: 2.5, sm: 4 }, px: { xs: 2, sm: 3 }, pb: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
+      <Container sx={{ py: { xs: 2.5, sm: 4 }, px: { xs: 2, sm: 3 }, pb: mobile ? `calc(env(safe-area-inset-bottom) + ${MOBILE_TAB_BAR_HEIGHT + 24}px)` : 'calc(env(safe-area-inset-bottom) + 24px)' }}>
+        {mobile ? (
+          <Box mb={2.5}>
+            <MobileAuditHero
+              website={website}
+              audits={audits}
+              selected={selectedSummary}
+              selectedAuditId={selectedAuditId}
+              onSelectAudit={handleSelectAudit}
+              onRunAudit={() => setNewAuditOpen(true)}
+              runDisabled={!workspaceId || !!latestIsActive}
+            />
+          </Box>
+        ) : (
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} mb={3}>
           <Box>
             <Typography variant="h5" fontWeight={800} sx={{ wordBreak: 'break-word' }}>
@@ -174,6 +201,7 @@ export default function WebsiteDetailPage() {
             </Button>
           </Stack>
         </Stack>
+        )}
 
         {auditsLoading && <CircularProgress size={24} />}
 
@@ -199,19 +227,21 @@ export default function WebsiteDetailPage() {
 
         {selectedAuditId && audits && audits.length > 0 && (
           <>
-            <Tabs
-              value={tab}
-              onChange={(_, v) => setTab(v)}
-              variant="scrollable"
-              scrollButtons={false}
-              sx={{ mb: 2, mx: { xs: -2, sm: 0 }, px: { xs: 1, sm: 0 }, borderBottom: 1, borderColor: 'divider' }}
-            >
-              <Tab label="Overview" />
-              <Tab label="Issues" />
-              <Tab label="Recommendations" />
-              <Tab label="Queries" />
-              <Tab label="History" />
-            </Tabs>
+            {!mobile && (
+              <Tabs
+                value={tab}
+                onChange={(_, v) => setTab(v)}
+                variant="scrollable"
+                scrollButtons={false}
+                sx={{ mb: 2, mx: { xs: -2, sm: 0 }, px: { xs: 1, sm: 0 }, borderBottom: 1, borderColor: 'divider' }}
+              >
+                <Tab label="Overview" />
+                <Tab label="Issues" />
+                <Tab label="Recommendations" />
+                <Tab label="Queries" />
+                <Tab label="History" />
+              </Tabs>
+            )}
 
             {tab === 4 ? (
               workspaceId && websiteId && audits ? (
@@ -259,6 +289,20 @@ export default function WebsiteDetailPage() {
           </>
         )}
       </Container>
+
+      {mobile && selectedAuditId && audits && audits.length > 0 && (
+        <MobileTabBar
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { label: 'Overview', icon: <DashboardRoundedIcon /> },
+            { label: 'Issues', icon: <ReportProblemRoundedIcon /> },
+            { label: 'Fixes', icon: <AutoFixHighRoundedIcon /> },
+            { label: 'Queries', icon: <QuestionAnswerRoundedIcon /> },
+            { label: 'History', icon: <HistoryRoundedIcon /> },
+          ]}
+        />
+      )}
 
       <NewAuditDialog
         open={newAuditOpen}

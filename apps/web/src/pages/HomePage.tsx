@@ -20,6 +20,9 @@ import AddIcon from '@mui/icons-material/Add';
 import LanguageRoundedIcon from '@mui/icons-material/LanguageRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import AppHeader from '../components/AppHeader';
+import MobileHome from '../components/mobile/MobileHome';
+import { useMobileLayout } from '../hooks/useMobileLayout';
+import { useAuth } from '../auth/AuthContext';
 import { apiClient } from '../api/client';
 
 interface Workspace {
@@ -42,6 +45,8 @@ interface Website {
  */
 export default function HomePage() {
   const navigate = useNavigate();
+  const mobile = useMobileLayout();
+  const { user, logout } = useAuth();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newUrl, setNewUrl] = useState('');
@@ -68,6 +73,54 @@ export default function HomePage() {
       setNewUrl('');
     },
   });
+
+  const addDialog = (
+  <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
+    <DialogTitle>Add a website</DialogTitle>
+    <DialogContent>
+      <TextField
+        autoFocus
+        fullWidth
+        margin="dense"
+        label="Website URL"
+        placeholder="https://example.com"
+        value={newUrl}
+        onChange={(e) => setNewUrl(e.target.value)}
+      />
+      {createWebsite.isError && (
+        <Typography color="error" variant="body2" mt={1}>
+          {(createWebsite.error as any)?.response?.data?.message ?? 'Failed to add website'}
+        </Typography>
+      )}
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+      <Button
+        variant="contained"
+        disabled={!newUrl || createWebsite.isPending}
+        onClick={() => createWebsite.mutate(newUrl)}
+      >
+        Add
+      </Button>
+    </DialogActions>
+  </Dialog>
+  );
+
+  if (mobile) {
+    return (
+      <>
+        <MobileHome
+          email={user?.email}
+          websites={websites}
+          isLoading={isLoading}
+          onOpenSite={(id) => navigate(`/websites/${id}`)}
+          onAdd={() => setDialogOpen(true)}
+          onLogout={logout}
+        />
+        {addDialog}
+      </>
+    );
+  }
 
   return (
     <Box bgcolor="background.default" minHeight="100dvh">
@@ -151,35 +204,7 @@ export default function HomePage() {
         )}
       </Container>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Add a website</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            margin="dense"
-            label="Website URL"
-            placeholder="https://example.com"
-            value={newUrl}
-            onChange={(e) => setNewUrl(e.target.value)}
-          />
-          {createWebsite.isError && (
-            <Typography color="error" variant="body2" mt={1}>
-              {(createWebsite.error as any)?.response?.data?.message ?? 'Failed to add website'}
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={!newUrl || createWebsite.isPending}
-            onClick={() => createWebsite.mutate(newUrl)}
-          >
-            Add
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {addDialog}
     </Box>
   );
 }
