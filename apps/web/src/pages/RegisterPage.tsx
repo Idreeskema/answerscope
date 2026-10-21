@@ -46,7 +46,7 @@ export default function RegisterPage() {
       login(res.data.accessToken, res.data.user);
       navigate('/');
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Registration failed');
+      setError(err?.response?.data?.message ?? `Registration failed: ${err?.message ?? 'unknown error'} (${apiClient.defaults.baseURL})`);
     } finally {
       setLoading(false);
     }
