@@ -116,7 +116,7 @@ export default function JsonBreakdown({
                   />
                 )}
                 <Box flex={1} minWidth={0}>
-                  <Typography variant="body2" fontWeight={600} noWrap>
+                  <Typography variant="body2" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
                     {checkId ? humanize(checkId) : 'Check'}
                   </Typography>
                   {pageId && (
@@ -169,15 +169,18 @@ export default function JsonBreakdown({
           const isPageIdField = /pageId$/i.test(key) && typeof val === 'string';
           const pageLabel = isPageIdField ? pageLabels?.[val as string] : undefined;
           return (
-            <Box key={key} sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+            <Box
+              key={key}
+              sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 0.25, sm: 1.5 }, alignItems: 'flex-start' }}
+            >
               <Typography
                 variant="caption"
                 color="text.secondary"
-                sx={{ minWidth: 150, flexShrink: 0, pt: 0.3, fontWeight: 600 }}
+                sx={{ minWidth: { sm: 150 }, flexShrink: 0, pt: { sm: 0.3 }, fontWeight: 600 }}
               >
                 {isPageIdField ? 'Page' : humanize(key)}
               </Typography>
-              <Box flex={1} minWidth={0}>
+              <Box flex={1} minWidth={0} width="100%">
                 {isStatusLike ? (
                   <Chip size="small" label={(val as string).replace(/_/g, ' ')} color={statusChipColor(val as string)} />
                 ) : isPrimitive ? (

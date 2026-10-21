@@ -70,14 +70,14 @@ function StatCard({
   color?: string;
 }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, flex: 1, minWidth: 0 }}>
+    <Paper variant="outlined" sx={{ p: { xs: 1.25, sm: 1.5 }, borderRadius: 2, flex: 1, minWidth: 0 }}>
       <Stack direction="row" alignItems="center" gap={0.75} mb={0.5}>
-        <Icon sx={{ fontSize: 16, color: color ?? 'text.secondary' }} />
+        <Icon sx={{ fontSize: 16, color: color ?? 'text.secondary', display: { xs: 'none', sm: 'block' } }} />
         <Typography variant="caption" color="text.secondary" noWrap>
           {label}
         </Typography>
       </Stack>
-      <Typography variant="h5" fontWeight={800} noWrap>
+      <Typography fontWeight={800} noWrap sx={{ fontSize: { xs: '1.15rem', sm: '1.5rem' } }}>
         {value}
       </Typography>
     </Paper>
@@ -134,7 +134,7 @@ export default function ScoreBreakdownDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 0 }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 0, px: { xs: 2, sm: 3 } }}>
         <Stack direction="row" alignItems="center" gap={1}>
           <Typography variant="h6" component="span" fontWeight={700}>
             {category ? categoryLabel(category) : ''}
@@ -154,7 +154,7 @@ export default function ScoreBreakdownDialog({
       </DialogTitle>
 
       {score && hasEvidenceContent && (
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, mt: 1 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: { xs: 1, sm: 3 }, mt: 1 }}>
           <Tabs value={tab} onChange={handleTabChange} variant="fullWidth">
             <Tab label="Summary" id="score-tab-summary" />
             <Tab label="Evidence" id="score-tab-evidence" />
@@ -162,24 +162,24 @@ export default function ScoreBreakdownDialog({
         </Box>
       )}
 
-      <DialogContent dividers sx={{ minHeight: score && hasEvidenceContent ? 320 : undefined }}>
+      <DialogContent dividers sx={{ px: { xs: 2, sm: 3 }, minHeight: score && hasEvidenceContent ? 320 : undefined }}>
         {!score ? (
           <Typography color="text.secondary">No score has been computed for this category yet.</Typography>
         ) : (
           <>
             {(tab === 0 || !hasEvidenceContent) && (
               <>
-                <Stack direction="row" spacing={1.5} mb={2.5}>
+                <Stack direction="row" spacing={{ xs: 1, sm: 1.5 }} mb={2.5}>
                   <StatCard
                     icon={StatusIcon ?? CheckCircleRoundedIcon}
                     label="Raw score"
                     value={`${Math.round(score.rawScore)}/100`}
                     color={statusColor}
                   />
-                  <StatCard icon={ScaleRoundedIcon} label="Weight in overall" value={`${(score.weight * 100).toFixed(0)}%`} />
+                  <StatCard icon={ScaleRoundedIcon} label="Weight" value={`${(score.weight * 100).toFixed(0)}%`} />
                   <StatCard
                     icon={AddchartRoundedIcon}
-                    label="Contribution to overall"
+                    label="Contribution"
                     value={`+${score.normalizedScore.toFixed(1)}`}
                   />
                 </Stack>
